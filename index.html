@@ -1,0 +1,419 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CPU Simulator</title>
+
+<style>
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #0b1020;
+    color: #f1f5f9;
+    padding: 25px;
+}
+
+.container {
+    max-width: 1100px;
+    margin: auto;
+}
+
+header {
+    background: linear-gradient(120deg, #312e81, #1d4ed8);
+    padding: 25px;
+    border-radius: 18px;
+    margin-bottom: 20px;
+}
+
+header h1 { margin: 0 0 8px; }
+header p { margin: 0; color: #dbeafe; }
+
+.grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+}
+
+.panel {
+    background: #151d31;
+    border: 1px solid #26334e;
+    border-radius: 15px;
+    padding: 20px;
+}
+
+.panel h2 {
+    margin-top: 0;
+    color: #93c5fd;
+    font-size: 19px;
+}
+
+textarea {
+    width: 100%;
+    height: 190px;
+    resize: vertical;
+    background: #080e1c;
+    color: #a7f3d0;
+    border: 1px solid #334155;
+    border-radius: 10px;
+    padding: 14px;
+    font-family: monospace;
+    font-size: 14px;
+    line-height: 1.7;
+}
+
+button {
+    border: 0;
+    border-radius: 9px;
+    padding: 11px 15px;
+    margin: 5px 3px 0 0;
+    cursor: pointer;
+    font-weight: bold;
+    background: #2563eb;
+    color: white;
+}
+
+button:hover { opacity: .85; }
+button.secondary { background: #334155; }
+button.green { background: #059669; }
+button.red { background: #dc2626; }
+
+.registers {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.register {
+    background: #0b1428;
+    border: 1px solid #334155;
+    padding: 15px;
+    border-radius: 10px;
+}
+
+.register span {
+    color: #94a3b8;
+    display: block;
+    font-size: 13px;
+}
+
+.register strong {
+    display: block;
+    font-size: 25px;
+    margin-top: 7px;
+    color: #67e8f9;
+}
+
+.memory {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+}
+
+.cell {
+    background: #0b1428;
+    padding: 10px;
+    border-radius: 8px;
+    text-align: center;
+    border: 1px solid #334155;
+}
+
+.cell small {
+    display: block;
+    color: #94a3b8;
+}
+
+.cell strong { color: #facc15; }
+
+.status {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 15px;
+}
+
+.status div {
+    background: #0b1428;
+    padding: 12px;
+    border-radius: 9px;
+    flex: 1;
+    min-width: 100px;
+}
+
+.status span {
+    display: block;
+    color: #94a3b8;
+    font-size: 12px;
+    margin-bottom: 5px;
+}
+
+#log {
+    height: 180px;
+    overflow-y: auto;
+    background: #080e1c;
+    padding: 12px;
+    border-radius: 9px;
+    color: #a7f3d0;
+    font-family: monospace;
+    font-size: 13px;
+    line-height: 1.7;
+}
+
+.output {
+    color: #facc15;
+    font-size: 20px;
+    font-weight: bold;
+}
+
+@media(max-width: 700px) {
+    body { padding: 12px; }
+    .grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<header>
+    <h1>🖥️ CPU Registers Simulator</h1>
+    <p>Computer Organization | Instruction Cycle Simulation</p>
+</header>
+
+<div class="grid">
+
+<section class="panel">
+    <h2>📝 Program Editor</h2>
+    <textarea id="program">LOAD R0, 20
+LOAD R1, 10
+ADD R0, R1
+OUTPUT R0</textarea>
+
+    <button onclick="loadProgram()">Load Program</button>
+    <button class="secondary" onclick="demo()">Demo Program</button>
+    <button class="green" onclick="runProgram()">▶ Run</button>
+    <button onclick="stepProgram()">Step</button>
+    <button class="red" onclick="resetCPU()">Reset</button>
+</section>
+
+<section class="panel">
+    <h2>⚙️ CPU Status</h2>
+
+    <div class="status">
+        <div><span>Program Counter</span><strong id="pc">0</strong></div>
+        <div><span>Instruction</span><strong id="current">None</strong></div>
+    </div>
+
+    <div class="status">
+        <div><span>Cycle Phase</span><strong id="phase">Ready</strong></div>
+        <div><span>Program Size</span><strong id="size">4</strong></div>
+    </div>
+
+    <h2 style="margin-top:22px">📟 CPU Registers</h2>
+    <div class="registers" id="registers"></div>
+</section>
+
+<section class="panel">
+    <h2>💾 Main Memory</h2>
+    <div class="memory" id="memory"></div>
+</section>
+
+<section class="panel">
+    <h2>📋 Execution Log</h2>
+    <div id="log">Welcome! Load a program to start.</div>
+    <h2 style="margin-top:20px">📤 Output</h2>
+    <div class="output" id="output">No output yet</div>
+</section>
+
+</div>
+</div>
+
+<script>
+let registers = [0, 0, 0, 0];
+let memory = Array(16).fill(0);
+let program = [];
+let pc = 0;
+let output = [];
+
+function draw() {
+    document.getElementById("pc").textContent = pc;
+    document.getElementById("size").textContent = program.length;
+
+    document.getElementById("registers").innerHTML =
+        registers.map((value, i) => `
+            <div class="register">
+                <span>Register R${i}</span>
+                <strong>${value}</strong>
+            </div>
+        `).join("");
+
+    document.getElementById("memory").innerHTML =
+        memory.map((value, i) => `
+            <div class="cell">
+                <small>Address ${i}</small>
+                <strong>${value}</strong>
+            </div>
+        `).join("");
+
+    document.getElementById("output").innerHTML =
+        output.length ? output.join("<br>") : "No output yet";
+}
+
+function log(message) {
+    const area = document.getElementById("log");
+    area.innerHTML += "<br>" + message;
+    area.scrollTop = area.scrollHeight;
+}
+
+function loadProgram() {
+    const lines = document.getElementById("program").value
+        .split("\n")
+        .map(line => line.trim())
+        .filter(line => line.length > 0);
+
+    program = lines;
+    pc = 0;
+    registers = [0, 0, 0, 0];
+    memory = Array(16).fill(0);
+    output = [];
+
+    document.getElementById("log").innerHTML =
+        "Program loaded successfully.";
+
+    document.getElementById("current").textContent = "None";
+    document.getElementById("phase").textContent = "Ready";
+
+    draw();
+}
+
+function demo() {
+    document.getElementById("program").value =
+`LOAD R0, 20
+LOAD R1, 10
+ADD R0, R1
+OUTPUT R0`;
+
+    loadProgram();
+}
+
+function stepProgram() {
+    if (pc >= program.length) {
+        log("Program finished.");
+        return;
+    }
+
+    const instruction = program[pc];
+    document.getElementById("current").textContent = instruction;
+
+    document.getElementById("phase").textContent = "Fetch";
+    log("FETCH: " + instruction);
+
+    document.getElementById("phase").textContent = "Decode";
+    log("DECODE: Understanding instruction");
+
+    document.getElementById("phase").textContent = "Execute";
+
+    try {
+        execute(instruction);
+        log("EXECUTE: Instruction completed");
+        pc++;
+    } catch (error) {
+        log("ERROR: " + error.message);
+        document.getElementById("phase").textContent = "Error";
+        return;
+    }
+
+    draw();
+
+    if (pc >= program.length) {
+        document.getElementById("phase").textContent = "Finished";
+        log("Program execution completed.");
+    }
+}
+
+function execute(instruction) {
+    const parts = instruction.toUpperCase()
+        .replaceAll(",", " ")
+        .trim()
+        .split(/\s+/);
+
+    const command = parts[0];
+
+    function getRegister(name) {
+        const match = name.match(/^R([0-3])$/);
+        if (!match) throw new Error("Invalid register: " + name);
+        return Number(match[1]);
+    }
+
+    if (command === "LOAD") {
+        const r = getRegister(parts[1]);
+        const value = Number(parts[2]);
+
+        if (!Number.isFinite(value))
+            throw new Error("Invalid LOAD value");
+
+        registers[r] = value;
+    }
+
+    else if (command === "ADD") {
+        const a = getRegister(parts[1]);
+        const b = getRegister(parts[2]);
+        registers[a] += registers[b];
+    }
+
+    else if (command === "SUBTRACT") {
+        const a = getRegister(parts[1]);
+        const b = getRegister(parts[2]);
+        registers[a] -= registers[b];
+    }
+
+    else if (command === "STORE") {
+        const r = getRegister(parts[1]);
+        const address = Number(parts[2]);
+
+        if (!Number.isInteger(address) || address < 0 || address >= 16)
+            throw new Error("Memory address must be from 0 to 15");
+
+        memory[address] = registers[r];
+    }
+
+    else if (command === "OUTPUT") {
+        const r = getRegister(parts[1]);
+        output.push("R" + r + " = " + registers[r]);
+        log("OUTPUT: R" + r + " = " + registers[r]);
+    }
+
+    else {
+        throw new Error("Unknown instruction: " + command);
+    }
+}
+
+function runProgram() {
+    while (pc < program.length) {
+        const oldPC = pc;
+        stepProgram();
+
+        if (pc === oldPC) break;
+    }
+}
+
+function resetCPU() {
+    registers = [0, 0, 0, 0];
+    memory = Array(16).fill(0);
+    pc = 0;
+    output = [];
+
+    document.getElementById("current").textContent = "None";
+    document.getElementById("phase").textContent = "Ready";
+    document.getElementById("log").innerHTML = "CPU has been reset.";
+
+    draw();
+}
+
+loadProgram();
+</script>
+</body>
+</html>
